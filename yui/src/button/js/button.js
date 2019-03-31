@@ -34,26 +34,25 @@ var SELECTORS = {
 };
 var TEMPLATE = '<form class="atto_form">' +
                     /**
-                     * The labels in the dialog box is globalized with language library files, 
-                     * using get_string 
-                     */  
+                     * The labels in the dialog box is globalized with language library files,
+                     * using get_string
+                     */
                     '<label for="{{elementid}}_atto_syntaxhighlighter_codearea">{{get_string "optionslabel" component}}</label>' +
                     '<select class="language">' +
-                        '<option value="c">C</option>' +
-                        '<option value="cpp">C++</option>' +
+                        '<option value="cpp">C/C++</option>' +
                         '<option value="html">HTML</option>' +
-                        '<option value="javascript">Javascript</option>' +
+                        '<option value="javascript">Java Script</option>' +
                         '<option value="php">PHP</option>' +
                         '<option value="python">Python</option>' +
                         '<option value="sql">SQL</option>' +
                     '</select>' +
-                    '<textarea class="fullwidth code {{style.CODEAREA}}" rows="12"></textarea><br>' +
+                    '<textarea class="fullwidth code {{style.CODEAREA}}" rows="12" style="font-family: monospace;"></textarea><br>' +
                     '<div class="mdl-align">' +
                         '<br>' +
                         /**
-                        * The labels in the dialog box is globalized with language library files, 
-                        * using get_string 
-                        */  
+                        * The labels in the dialog box is globalized with language library files,
+                        * using get_string
+                        */
                         '<button type="submit" class="submit">{{get_string "submitbutton" component}}</button>' +
                     '</div>' +
                 '</form>';
@@ -92,9 +91,10 @@ var logic = {
      * @private
      */
     _content: null,
+
     initializer: function() {
         this.addButton({
-            icon: 'e/source_code',
+            icon: 'i/categoryevent',
             callback: this._displayDialogue
         });
     },
@@ -117,17 +117,28 @@ var logic = {
      * @private
      */
     _displayDialogue: function() {
-        this._currentSelection = this.get('host').getSelection();
-        if (this._currentSelection === false) {
+        let host = this.get('host');
+        if (!host.isActive()) {
             return;
         }
+        let selNode = host.getSelectionParentNode();
+        if (selNode && selNode.parentNode.nodeName == 'CODE'
+                    && selNode.parentNode.parentNode.nodeName == 'PRE') {
+            let range = rangy.createRange();
+            range.selectNode(selNode.parentNode);
+            let selection = [range];
+            host.setSelection(selection);
+        }
+        this._currentSelection = this.get('host').getSelection();
 
         var dialogue = this.getDialogue({
             /**
-            * The headerContent is globalized with language library files, 
-            * using get_string 
+            * The headerContent is globalized with language library files,
+            * using get_string
             */
             headerContent: M.util.get_string('dialogboxtitle', COMPONENTNAME),
+            width: 800,
+            centered: true,
             focusAfterHide: true,
             focusOnShowSelector: SELECTORS.CODEAREA
         });
@@ -167,19 +178,26 @@ var logic = {
         host.setSelection(this._currentSelection);
 
         var selectednode;
-        var collapsed = (this._currentSelection[0].collapsed);
+        var collapsed = true; //(this._currentSelection[0].collapsed);
         if (collapsed) {
-
-            if (this._selectedLanguage === 'html') {
-                code = this._escapeHTML(code);
-            }
-
+            code = this._escapeHTML(code);
             var codenode = Y.Node.create('<code>' + code + '</code>');
-
-            codenode.setAttribute('class', this._selectedLanguage);
+            var lang = this._selectedLanguage;
+            if (null == lang) {
+                lang = 'cpp';
+            }
+            codenode.addClass(lang)
+                    .addClass("nohighlight")
+                    .addClass("hljs")
+                    .addClass("hljs_atto");
+            codenode.setAttribute('contenteditable', "false");
             var prenode = Y.Node.create('<pre>' + codenode.get('outerHTML') + '</pre>');
 
             selectednode = host.insertContentAtFocusPoint(prenode.get('outerHTML'));
+            selectednode.on("dblclick", function(event) {
+               event.preventDefault();
+               this._displayDialogue();
+            }, this);
             host.setSelection(host.getSelectionFromNode(selectednode));
         }
 
@@ -208,6 +226,7 @@ var logic = {
         }, this);
 
         this._content.one('.submit').on('click', this._submitCodeForHighlighting, this);
+        this._content.one('.code').set('value', this._currentSelection);
 
         return this._content;
     }
